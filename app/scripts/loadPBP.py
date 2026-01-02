@@ -4,35 +4,29 @@ from nba_api.stats.endpoints import leaguegamefinder
 from nba_api.stats.library.parameters import Season
 from nba_api.stats.library.parameters import SeasonType
 from nba_api.stats.endpoints import playbyplayv3
+from datetime import timedelta
 import isodate
 import time
 import re
 import pandas as pd
 
-# Getting orlando magic team id
+def iso8601_to_sql_interval(duration: str) -> str:
+    pattern = r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?'
+    match = re.match(pattern, duration)
+    if not match:
+        raise ValueError(f"Invalid ISO 8601 duration: {duration}")
+    
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = float(match.group(3) or 0)
 
-nba_teams = teams.get_teams()
-magic = [team for team in nba_teams if team['abbreviation'] == 'ORL'][0]
-magic_id = magic['id']
-print(f'magic id: {magic_id}')
-
-# Getting games from this season (regular season games from this year)
-
-gamefinder = leaguegamefinder.LeagueGameFinder(team_id_nullable=magic_id,
-                            season_nullable=Season.default,
-                            season_type_nullable=SeasonType.regular)  
-games_dict = gamefinder.get_normalized_dict()
-games = games_dict['LeagueGameFinderResults']
+    sec_int = int(seconds)
+    microsec = int((seconds - sec_int) * 1_000_000)
+    interval_str = f"{hours} hours {minutes} minutes {sec_int} seconds {microsec} microseconds"
+    
+    return interval_str
 
 # Get play by play from found games 
-
-dfs = []
-
-for game in games:
-    dfs.append(playbyplayv3.PlayByPlayV3(game_id = game['GAME_ID']).get_data_frames()[0])
-    time.sleep(2) # avoid hitting rate limit
-
-# connect to database
 
 conn = psycopg2.connect(
     database="streamd",
@@ -44,22 +38,20 @@ conn = psycopg2.connect(
 # Open cursor to perform database operations
 cur = conn.cursor()
 
-# final_df contains all of the playbyplay info for the specified timeframe that we need to go through
+cur.execute('SELECT game_id, season_type, season_id FROM Game;')
+rows = cur.fetchall()
+game_ids = [row[0] for row in rows]
 
-# https://github.com/swar/nba_api/blob/master/docs/examples/PlayByPlay.ipynb sourced for play by play endpoint usage
+dfs = []
+for row in rows:
+    df = (playbyplayv3.PlayByPlayV3(game_id = row[0]).get_data_frames()[0])
+    df['season_type'] = row[1]
+    df['season_id'] = row[2]
+    time.sleep(2) # avoid hitting rate limit
 
 # -- IN THE FUTURE, SET UP SUPPORT FOR SHOT CHART DETAIL ENDPOINT WHICH WILL GIVE COORDINATES AND MORE ACCURATE SHOT LOCATION INFORMATION
 
-
-
 final_df = pd.concat(dfs, ignore_index=True)
-game_teams = (
-    final_df[['gameId', 'location', 'teamId']]
-    .drop_duplicates()
-    .pivot(index='game_id', columns='location', values='teamId')
-    .rename(columns={'h': 'home_team_id', 'v': 'visiting_team_id'})
-)
-final_df = final_df.merge(game_teams, on='game_id', how='left')
 for index, row in final_df.iterrows():
     # retooling with v3 endpoint its way better
     if row['isFieldGoal'] == 1:
@@ -67,15 +59,23 @@ for index, row in final_df.iterrows():
         event_num = row['actionNumber']
         event_type = row['actionType']
         event_subtype = row['subType']
-        season = row['season'] # must add manually
+        season = row['season_id'] # must add manually
         season_type = row['season_type'] # must add manually
         period = row['period']
+        clock = iso8601_to_sql_interval(row['clock'])
         posession_team_id = row['teamId']
         primary_player_id = row['personId']
         home_team_id = row['home_team_id']
         away_team_id = row['visiting_team_id']
-        
+        shot_x = row['xLegacy']
+        shot_y = row['yLegacy']
+        home_score = row['scoreHome']
+        away_score = row['scoreAway']
+        is_three = row['shotValue'] == 3
+        shot_made = row['shotResult'] == 'Made'
+        points = 
 
+        
         
 
 

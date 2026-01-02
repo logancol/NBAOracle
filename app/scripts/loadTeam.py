@@ -17,11 +17,12 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
-team_abbreviations = [
-    "ATL", "BOS", "BRK", "CHI", "CHO", "CLE", "DAL", "DEN",
-    "DET", "GSW", "HOU", "IND", "LAC", "LAL", "MEM", "MIA",
-    "MIL", "MIN", "NOP", "NYK", "OKC", "ORL", "PHI", "PHX",
-    "POR", "SAC", "SAS", "TOR", "UTA", "WAS"
+historical_team_abbreviations = [
+    # historical teams in play-by-play era
+    "NJN",  # New Jersey Nets (pre-Brooklyn)
+    "CHB",  # CHARLOTTE BOBCATS
+    "VAN",  # Vancouver Grizzlies
+    "SEA"   # Seattle SuperSonics
 ]
 
 all_teams = teams._get_teams()
@@ -31,5 +32,10 @@ for team in all_teams:
     abbreviation = team['abbreviation']
     nickname = team['nickname']
     city = team['city']
-    cur.execute("INSERT INTO Team (team_id, team_full_name, team_abbreviation, team_nickname, team_city) VALUES (%s, %s, %s, %s, %s)", (id, full_name, abbreviation, nickname, city))
+    cur.execute("INSERT INTO Team (team_id, team_full_name, team_abbreviation, team_nickname, team_city) VALUES (%s, %s, %s, %s, %s);", (id, full_name, abbreviation, nickname, city))
+
+cur.execute("INSERT INTO Team (team_id, team_full_name, team_abbreviation, team_nickname, team_city) VALUES (%s, %s, %s, %s, %s);", (1, "New Jersey Nets", "NJN", "Nets", "New Jersey"))
+cur.execute("INSERT INTO Team (team_id, team_full_name, team_abbreviation, team_nickname, team_city) VALUES (%s, %s, %s, %s, %s);", (2, "Charlotte Bobcats", "CHB", "Bobcats", "Charlotte"))
+cur.execute("INSERT INTO Team (team_id, team_full_name, team_abbreviation, team_nickname, team_city) VALUES (%s, %s, %s, %s, %s);", (3, "Vancouver Grizzlies", "VAN", "Grizzlies", "Vancouver"))
+cur.execute("INSERT INTO Team (team_id, team_full_name, team_abbreviation, team_nickname, team_city) VALUES (%s, %s, %s, %s, %s);", (4, "Seattle SuperSonics", "SEA", "SuperSonics", "Seattle"))
 conn.commit()
