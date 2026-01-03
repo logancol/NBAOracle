@@ -39,7 +39,7 @@ cur = conn.cursor()
 
 cur.execute('SELECT game_id, season_type, season_id, home_team_id, away_team_id FROM Game;')
 rows = cur.fetchall()
-game_ids = [row[0] for row in rows if row[2] == 22025]
+game_ids = [row[0] for row in rows if row[2] == 22025] # filter only for 2025 events for now
 
 num_games = len(game_ids)
 count = 0

@@ -8,7 +8,7 @@ from datetime import datetime
 
 team_abbreviations = [
     # current teams
-    "ATL", "BOS", "BRK", "CHI", "CHA", "CLE", "DAL", "DEN",
+    "ATL", "BOS", "BKN", "CHI", "CHA", "CLE", "DAL", "DEN",
     "DET", "GSW", "HOU", "IND", "LAC", "LAL", "MEM", "MIA",
     "MIL", "MIN", "NOP", "NYK", "OKC", "ORL", "PHI", "PHX",
     "POR", "SAC", "SAS", "TOR", "UTA", "WAS",
@@ -59,7 +59,7 @@ for id in team_ids:
         season_id = game['SEASON_ID']
         home_team_id = -1
         away_team_id = -1
-        if game['MATCHUP'][4] == '@': # home team away
+        if game['MATCHUP'][4] == '@': # primary team away
             away_team_id = game['TEAM_ID']
             home_team_id = id_map[team_2]
         else:
