@@ -1,2 +1,4 @@
 # Env Variables
 .env
+
+__pycache__

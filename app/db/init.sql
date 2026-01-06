@@ -32,7 +32,7 @@ CREATE TABLE pbp_raw_event_shots (
   event_type         TEXT NOT NULL,  
   event_subtype      TEXT,    
 
-  -- Game context
+  -- Game Context
   season             INTEGER NOT NULL,
   home_score         INTEGER,
   away_score         INTEGER,
@@ -42,7 +42,6 @@ CREATE TABLE pbp_raw_event_shots (
   home_team_id       INTEGER REFERENCES Team(team_id),
   away_team_id       INTEGER REFERENCES Team(team_id),
   possession_team_id INTEGER,
-
   primary_player_id  INTEGER,  
 
   -- Shot context
@@ -53,6 +52,7 @@ CREATE TABLE pbp_raw_event_shots (
   shot_made          BOOLEAN,
   points             INTEGER,
 
+  -- Metadata
   created_at         TIMESTAMP DEFAULT now(),
 
   PRIMARY KEY (game_id, event_num)

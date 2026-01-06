@@ -6,7 +6,6 @@ import time
 import os
 import logging
 import sys
-
 # Fast API app setup
 app = FastAPI(title="BBALL ORACLE")
 load_dotenv() 

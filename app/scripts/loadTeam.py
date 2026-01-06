@@ -26,6 +26,10 @@ historical_team_abbreviations = [
     
 ]
 
+new_team_abrev = ['IND' 'UTA' 'MIL' 'CLE' 'LAL' 'HOU' 'TOR' 'SAS' 'POR' 'BOS' 'WAS' 'ATL'
+ 'SAC' 'DET' 'NJN' 'CHH' 'VAN' 'PHX' 'NYK' 'MIN' 'DEN' 'MIA' 'DAL' 'GSW'
+ 'SEA' 'CHI' 'LAC' 'ORL' 'PHI' 'MEM' 'NOH' 'CHA' 'NOK' 'OKC' 'BKN' 'NOP']
+
 all_teams = teams._get_teams()
 for team in all_teams:
     id = team['id']
