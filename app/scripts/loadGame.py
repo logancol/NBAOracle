@@ -67,7 +67,7 @@ class GameLoader():
         # TEAM PERFORMANCE
         mins = game['MIN']
         pts = game['PTS']
-        overtime = mins > 250
+        overtime = mins > 250 # this is a bit of an assumption will confirm using play by play data
         field_goals_made = game['FGM']
         field_goals_attempted = game['FGA']
         field_goal_percentage = game['FG_PCT']

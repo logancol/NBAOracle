@@ -71,32 +71,47 @@ CREATE TABLE game_team_performance
     FOREIGN KEY (team_id, team_abrev) REFERENCES modern_team_index (id, abrev)
 );
 
-CREATE TABLE pbp_raw_event_shots (
-  game_id            BIGINT NOT NULL REFERENCES Game(game_id),
-  event_num          INTEGER NOT NULL,    
-  event_type         TEXT NOT NULL,  
-  event_subtype      TEXT,    
+CREATE TABLE pbp_raw_event(
+    game_id INT REFERENCES game(id),
+    event_num INT NOT NULL,    
+    event_type TEXT NOT NULL,  
+    event_subtype TEXT,    
+    home_score INTEGER,
+    away_score INTEGER,
+    period INTEGER NOT NULL,
+    clock INTERVAL NOT NULL, 
+    home_team_id INTEGER REFERENCES Team(team_id),
+    away_team_id INTEGER REFERENCES Team(team_id),
+    possession_team_id INTEGER REFERENCES Team(team_id),
+    is_overtime BOOLEAN,
+    
+    shooter_id INT REFERENCES Player(id),
+    assister_id INT REFERENCES Player(id),
+    jump_ball_winner_id INT REFERENCES Player(id),
+    jump_ball_loser_id INT REFERENCES Player(id),
+    jump_ball_recovered_id INT REFERENCES Player(id),
+    rebounder_id INT REFERENCES Player(id),
+    foul_drawn_id INT REFERENCES Player(id),
+    fouler_id INT REFERENCES Player(id),
+    steal_id INT REFERENCES Player(id),
+    block_id INT REFERENCES Player(id),
+    sub_in_id INT REFERENCES Player(id),
+    sub_out_id INT REFERENCES Player(id),
 
-  season             INTEGER NOT NULL,
-  home_score         INTEGER,
-  away_score         INTEGER,
-  season_type        TEXT NOT NULL,  
-  period             INTEGER NOT NULL,
-  clock              INTERVAL NOT NULL, 
-  home_team_id       INTEGER REFERENCES Team(team_id),
-  away_team_id       INTEGER REFERENCES Team(team_id),
-  possession_team_id INTEGER,
-  primary_player_id  INTEGER,  
+    foul_is_technical BOOLEAN,
+    offensive_rebound BOOLEAN,
+    side TEXT,
+    descriptor TEXT,
+    area TEXT,
+    area_detail TEXT,
+    shot_distance FLOAT,
+    shot_made BOOLEAN,
+    shot_value INT,
+    shot_x FLOAT,                  
+    shot_y FLOAT,
 
-  shot_x             INTEGER,                  
-  shot_y             INTEGER,
-  assister_id        INTEGER,
-  is_three           BOOLEAN,
-  shot_made          BOOLEAN,
-  points             INTEGER,
+    created_at         TIMESTAMP DEFAULT now(),
 
-  created_at         TIMESTAMP DEFAULT now(),
-
-  PRIMARY KEY (game_id, event_num)
+    PRIMARY KEY (game_id, event_num)
 );
 

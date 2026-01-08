@@ -3,7 +3,7 @@ from nba_api.stats.static import teams
 from nba_api.stats.endpoints import leaguegamefinder
 from nba_api.stats.library.parameters import Season
 from nba_api.stats.library.parameters import SeasonType
-from nba_api.stats.endpoints import playbyplayv3
+from nba_api.live.nba.endpoints import PlayByPlay
 from datetime import timedelta
 import isodate
 import time
@@ -15,7 +15,7 @@ import os
 import unicodedata
 import logging
 
-class PBPShotDataLoader:
+class PBPDataLoader:
     # --- Configure db connection and logging ---
     def __init__(self, db_connection, update: bool):
         self.conn = db_connection
@@ -28,7 +28,7 @@ class PBPShotDataLoader:
         self.logger.addHandler(stream_handler)
         self.update = update
 
-    # --- Remove accents from player name ---
+    # --- Remove accents from player name utility ---
     def remove_accents(self, s: str) -> str: 
         if not isinstance(s, str):
             return s
@@ -37,32 +37,6 @@ class PBPShotDataLoader:
             .encode("ascii", "ignore")
             .decode("ascii")
         )
-
-    # --- Parse shot description to gather shot assister ---
-    def parse_description_assist(self, game: pd.DataFrame, description: str, teamId: int) -> str:
-
-        # Gather assister name from shot description
-        assister = ""
-        match = re.search(r'\(([^)]+?)\s\d+\sAST\)', description)
-        if match:
-            assister = match.group(1)
-        else:
-            return None
-        
-        # Look in current game df for the id associated with the normalized name pulled from the shot description
-        player_name_cond = game['playerName'].apply(self.remove_accents) == assister
-        player_name_I_cond = game['playerNameI'].apply(self.remove_accents) == assister
-        team_id_cond = game['teamId'] == teamId
-        
-        # Use name conditions to find personId for the assister
-        combined = (player_name_cond | player_name_I_cond) & team_id_cond
-        filtered = game[combined]
-        assister_id = None
-        if not filtered.empty:
-            assister_id = filtered.iloc[0]['personId']
-        else:
-            assister_id = None
-        return assister_id
             
     # --- Helper: Convert the iso8601 timestamps (shot clock) to intervals for storage in postgres db
     def iso8601_to_sql_interval(self, duration: str) -> str:
@@ -81,8 +55,8 @@ class PBPShotDataLoader:
         
         return interval_str
     
-    # --- Loading play by play data for shots for season in season_ids ---
-    def insert_pbp_shot_data_batch(self, data: list, batch_size: int):
+    # --- Loading play by play data for shots for season in season_ids, batching for efficiency ---
+    def insert_pbp_data_batch(self, data: list, batch_size: int):
         for start in range(0, len(data), batch_size):
             end = start + batch_size
             batch = data[start:end]
@@ -99,7 +73,7 @@ class PBPShotDataLoader:
         self.logger.info("====== SUCESSFULLY INSERTED BATCHED PBP DATA ======")
 
 
-    def load_pbp_shot_data(self):    
+    def load_pbp_data(self):    
         if self.update:
             season_ids = [22025]
         else:
@@ -110,79 +84,131 @@ class PBPShotDataLoader:
                           22020, 42020, 22021, 42021, 22022, 42022, 22023, 42023, 22024, 42024, 22025]
 
         # Fetch games logged in the database
-        self.cur.execute('SELECT game_id, season_type, season_id, home_team_id, away_team_id FROM Game;') 
-        rows = self.cur.fetchall()
+        try:
+            self.cur.execute('SELECT id, season_type, season_id, home_team_id, away_team_id FROM Game;') 
+            rows = self.cur.fetchall()
+        except psycopg2.Error as e:
+            self.logger.error(f"====== ERROR FETCHING GAME INFO: {e} ======")
 
-        # game ids for seasons in season_ids
         relevant_games = [row for row in rows if row[2] in season_ids]
         num_games = len(relevant_games)
         count = 0
 
-        # storing pbp dfs for each fetched game
-        dfs = []
+        # getting pbp dfs for each fetched game, processing, inserting into dataframe
         for row in relevant_games:
             count += 1
             self.logger.info(f'====== FETCHING PBP INFO FOR GAME: {count} OF {num_games} ======')
             game_id = str(row[0]).zfill(10)
             try:
-                df = playbyplayv3.PlayByPlayV3(game_id=game_id).get_data_frames()[0]
+                pbp = PlayByPlay.player_stats(game_id=game_id)
+                df = pd.DataFrame(pbp.actions.get_dict())
             except Exception as e:
                 self.logger.error(f'======= ERROR FETCHING PBP INFO FOR GAME {game_id} ======')
+            game_id = int(game_id)
             df['season_type'] = row[1] # append season type string manually
             df['season_id'] = row[2] # append season id manually
             df['home_team_id'] = row[3] 
             df['away_team_id'] = row[4]
-            time.sleep(0.2) # adjust to avoid rate limiting
-            dfs.append(df)
+            # lets try just logging this data here
+            
+            for _, event in df.iterrows():
+                # non-conditional on event type
+                event_num = event['actionNumber']
+                event_type = event['actionType']
+                event_subtype = event['subType']
+                home_score = event['scoreHome']
+                away_score = event['scoreAway']
+                period = event['period']
+                clock = self.iso8601_to_sql_interval(event['clock'])
+                home_team_id = row[3]
+                away_team_id = row[4]
+                possesion_team_id = event['possession']
+                is_over_time = False
+                if period > 4:
+                    is_overtime = True
 
-        # concatenating pbp data for each game
-        final_df = pd.concat(dfs, ignore_index=True)
-        
-        # total pbp events to log
-        total = len(final_df.index)
-        count = 0
-        shot_data = []
-        for _ , row in final_df.iterrows():
-            self.logger.info(f"====== PROCESSING EVENT {_} OF {total} ======")
-            count += 1
-            if row['isFieldGoal'] == 1:
+                # conditional on event
+                shooter_id = None
                 assister_id = None
-                game_id = row['gameId']
-                event_num = row['actionNumber']
-                event_type = row['actionType']
-                event_subtype = row['subType']
-                season = row['season_id']
-                season_type = row['season_type']
-                period = row['period']
-                clock = self.iso8601_to_sql_interval(row['clock'])
-                possession_team_id = row['teamId']
-                primary_player_id = row['personId']
-                home_team_id = row['home_team_id']
-                away_team_id = row['away_team_id']
-                shot_x = row['xLegacy']
-                shot_y = row['yLegacy']
-                home_score = None if row['scoreHome'] == '' else int(row['scoreHome'])
-                away_score = None if row['scoreAway'] == '' else int(row['scoreAway'])
-                is_three = row['shotValue'] == 3
-                shot_made = row['shotResult'] == 'Made'
-                points = row['shotValue'] if row['shotResult'] == 'Made' else 0
-                if row['shotResult'] == 'Made':
-                    sub = final_df[final_df['gameId'] == game_id][['playerName', 'playerNameI', 'teamId', 'personId']].drop_duplicates()
-                    result = self.parse_description_assist(sub, row['description'], row['teamId'])
-                    if result:
-                        assister_id = int(result)
-                event = [game_id, event_num, event_type, event_subtype, season, home_score, away_score, 
-                         season_type, period, clock, home_team_id, away_team_id, possession_team_id, primary_player_id, 
-                         shot_x, shot_y, assister_id, is_three, shot_made, points]
-                shot_data.append(event)
-        self.insert_pbp_shot_data_batch(shot_data, batch_size=1000)           
+                jump_ball_winner_id = None
+                jump_ball_loser_id = None
+                jump_ball_recovered_id = None
+                rebounder_id = None
+                foul_drawn_id = None
+                fouler_id = None
+                stealer_id = None
+                blocker_id = None
+                sub_in_id = None
+                sub_out_id = None
+                turnover_id = None
+                foul_is_technical = None
+                offensive_rebound = None
+                side = None
+                descriptor = None
+                area = None
+                area_detail = None
+                shot_distance = None
+                shot_made = None
+                shot_value = None
+                shot_x = None            
+                shot_y = None
+
+                # filling conditional on event type
+                if event['actionType'] == 'freethrow':
+                    shot_value = 1
+                    shooter_id = event['personId']
+                    shot_made = True if event['shotResult'] == 'Made' else False
+                elif event['isFieldGoal'] == 1: # nba_api does not properly support logging made heaves at the moment, I should do this an an open source contribution, ignoring for now
+                    if event['actionType'] == '2pt':
+                        shot_value = 2
+                    else:
+                        shot_value = 3
+                    side = event['side']
+                    descriptor = event['descriptor']
+                    shot_x = event['x']
+                    shot_y = event['y']
+                    area = event['area']
+                    area_detail = event['areaDetail']
+                    shot_distance = event['shotDistance']
+                    shooter_id = event['personId']
+                    assister_id = int(event['assistPersonId'])
+                    shot_made = True if event['shotResult'] == 'Made' else False
+                    if not shot_made:
+                        if event['blocker_id']:
+                            blocker_id = int(event['blockPersonId'])
+                elif event['actionType'] == 'jumpball':
+                    jump_ball_recovered_id = int(event['jumpBallRecoverdPersonId'])
+                    jump_ball_loser_id = int(event['jumpBallLostPersonId'])
+                    jump_ball_winner_id = int(event['jumpBallWonPersonId'])
+                elif event['actionType'] == 'turnover':
+                    turnover_id = event['personId']
+                    area = event['area']
+                    area_detail = event['areaDetail']
+                    if event['stealPersonId']:
+                        stealer_id = int(event['stealPersonId'])
+                elif event['actionType'] == 'foul':
+                    foul_is_technical = event['subType'] == 'technical'
+                    foul_drawn_id = event['foulDrawnPersonId']
+                    fouler_id = event['personId']
+                elif event['actionType'] == 'substitution':
+                    if event['subType'] == 'out':
+                        sub_out_id = event['personId']
+                    if event['subType'] == 'in':
+                        sub_in_id = event['personId']
+                elif event['actionType'] == 'rebound':
+                    rebounder_id = event['personId']
+                    offensive_rebound = event['subType'] == 'offensive'
+
+
+
+        
 
 def main():
     load_dotenv() 
     DB_URL = os.getenv("DATABASE_URL")
     conn = psycopg2.connect(DB_URL)
-    shot_data_loader = PBPShotDataLoader(conn, update=True)
-    shot_data_loader.load_pbp_shot_data()
+    data_loader = PBPDataLoader(conn, update=True)
+    data_loader.load_pbp_data()
 
 if __name__ == '__main__':
     main()
