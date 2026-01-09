@@ -27,7 +27,15 @@ class PBPDataLoader:
         stream_handler.setFormatter(log_formatter)
         self.logger.addHandler(stream_handler)
         self.update = update
-
+        try:
+            self.logger.info(f"====== FETCHING UNIQUE PLAYER IDS =======")
+            self.cur.execute("SELECT DISTINCT id FROM player;")
+            rows = self.cur.fetchall()
+            self.player_ids = [row[0] for row in rows]
+        except Exception:
+            self.logger.error(f"====== PROBLEM LOADING TEAM IDS =======")
+            self.player_ids = []
+        
     # --- Remove accents from player name utility ---
     def remove_accents(self, s: str) -> str: 
         if not isinstance(s, str):
@@ -72,6 +80,9 @@ class PBPDataLoader:
         self.conn.commit()
         self.logger.info("====== SUCESSFULLY INSERTED BATCHED PBP DATA ======")
 
+    def commit_and_close(self):
+        self.conn.commit()
+        self.conn.close()
 
     def load_pbp_data(self):    
         if self.update:
@@ -85,7 +96,7 @@ class PBPDataLoader:
 
         # Fetch games logged in the database
         try:
-            self.cur.execute('SELECT id, season_type, season_id, home_team_id, away_team_id FROM Game;') 
+            self.cur.execute('SELECT id, season_type, season_id, home_team_id, away_team_id, home_team_abrev, away_team_abrev FROM Game;') 
             rows = self.cur.fetchall()
         except psycopg2.Error as e:
             self.logger.error(f"====== ERROR FETCHING GAME INFO: {e} ======")
@@ -100,15 +111,18 @@ class PBPDataLoader:
             self.logger.info(f'====== FETCHING PBP INFO FOR GAME: {count} OF {num_games} ======')
             game_id = str(row[0]).zfill(10)
             try:
-                pbp = PlayByPlay.player_stats(game_id=game_id)
-                df = pd.DataFrame(pbp.actions.get_dict())
+                pbp = PlayByPlay(game_id = game_id)
+                df = pd.DataFrame(pbp.actions.get_dict()) # move to eventually not do this conversion for better efficiency
             except Exception as e:
                 self.logger.error(f'======= ERROR FETCHING PBP INFO FOR GAME {game_id} ======')
+                return False
             game_id = int(game_id)
-            df['season_type'] = row[1] # append season type string manually
-            df['season_id'] = row[2] # append season id manually
-            df['home_team_id'] = row[3] 
-            df['away_team_id'] = row[4]
+            season_type = row[1] # append season type string manually
+            season_id = row[2] # append season id manually
+            home_team_id = row[3] 
+            away_team_id = row[4]
+            home_team_abrev = row[5]
+            away_team_abrev = row[6]
             # lets try just logging this data here
             
             for _, event in df.iterrows():
@@ -122,10 +136,23 @@ class PBPDataLoader:
                 clock = self.iso8601_to_sql_interval(event['clock'])
                 home_team_id = row[3]
                 away_team_id = row[4]
-                possesion_team_id = event['possession']
-                is_over_time = False
-                if period > 4:
-                    is_overtime = True
+                possession_team_abrev = None
+                possession_team_id = None
+                event_team_id = None
+                event_team_abrev = None
+                if pd.notna(event['teamId']):
+                    event_team_id = int(float(event['teamId']))
+                if event['teamTricode']:
+                    event_team_abrev = event['teamTricode']
+                if pd.notna(event['possession']):
+                    possession_team_id = int(float(event['possession']))
+                    if possession_team_id == home_team_id:
+                        possession_team_abrev = home_team_abrev
+                    elif possession_team_id == away_team_id:
+                        possession_team_abrev = away_team_abrev
+                    else:
+                        possession_team_abrev = None
+                is_overtime = period > 4
 
                 # conditional on event
                 shooter_id = None
@@ -137,11 +164,15 @@ class PBPDataLoader:
                 foul_drawn_id = None
                 fouler_id = None
                 stealer_id = None
+                team_rebound = None
+                team_turnover = None
                 blocker_id = None
                 sub_in_id = None
                 sub_out_id = None
                 turnover_id = None
                 foul_is_technical = None
+                foul_is_personal = None
+                foul_is_offensive = None
                 offensive_rebound = None
                 side = None
                 descriptor = None
@@ -156,8 +187,10 @@ class PBPDataLoader:
                 # filling conditional on event type
                 if event['actionType'] == 'freethrow':
                     shot_value = 1
-                    shooter_id = event['personId']
+                    shooter_id = event['personId'] if event['personId'] in self.player_ids else None
                     shot_made = True if event['shotResult'] == 'Made' else False
+
+                # heave game id logged in google doc
                 elif event['isFieldGoal'] == 1: # nba_api does not properly support logging made heaves at the moment, I should do this an an open source contribution, ignoring for now
                     if event['actionType'] == '2pt':
                         shot_value = 2
@@ -170,38 +203,104 @@ class PBPDataLoader:
                     area = event['area']
                     area_detail = event['areaDetail']
                     shot_distance = event['shotDistance']
-                    shooter_id = event['personId']
-                    assister_id = int(event['assistPersonId'])
+                    if event['personId']:
+                        shooter_id = event['personId'] if event['personId'] in self.player_ids else None
+                    if pd.notna(event['assistPersonId']):
+                        assister_id = int(event['assistPersonId']) if int(event['assistPersonId']) in self.player_ids else None
                     shot_made = True if event['shotResult'] == 'Made' else False
                     if not shot_made:
-                        if event['blocker_id']:
-                            blocker_id = int(event['blockPersonId'])
+                        if pd.notna(event['blockPersonId']):
+                            blocker_id = int(event['blockPersonId']) if int(event['blockPersonId']) in self.player_ids else None
+
                 elif event['actionType'] == 'jumpball':
-                    jump_ball_recovered_id = int(event['jumpBallRecoverdPersonId'])
-                    jump_ball_loser_id = int(event['jumpBallLostPersonId'])
-                    jump_ball_winner_id = int(event['jumpBallWonPersonId'])
+                    #if pd.notna(event['jumpBallRecoverdPersonId']):
+                        #jump_ball_recovered_id = int(event['jumpBallRecoverdPersonId']) if int(event['jumpBallRecoverdPersonId']) in self.player_ids else None
+                    if pd.notna(event['jumpBallLostPersonId']):
+                        jump_ball_loser_id = int(event['jumpBallLostPersonId']) if int(event['jumpBallLostPersonId']) in self.player_ids else None
+                    if pd.notna(event['jumpBallWonPersonId']):
+                        jump_ball_winner_id = int(event['jumpBallWonPersonId']) if int(event['jumpBallWonPersonId']) in self.player_ids else None
+
                 elif event['actionType'] == 'turnover':
-                    turnover_id = event['personId']
-                    area = event['area']
+                    if event['personId']:
+                        turnover_id = int(event['personId']) if int(event['personId']) in self.player_ids else None
+                        team_turnover = False
+                    else:
+                        team_turnover = True
+                    if event['area']:
+                        area = event['area']
                     area_detail = event['areaDetail']
-                    if event['stealPersonId']:
-                        stealer_id = int(event['stealPersonId'])
+                    if pd.notna(event['stealPersonId']):
+                        stealer_id = int(event['stealPersonId']) if int(event['stealPersonId']) in self.player_ids else None
+
                 elif event['actionType'] == 'foul':
                     foul_is_technical = event['subType'] == 'technical'
-                    foul_drawn_id = event['foulDrawnPersonId']
-                    fouler_id = event['personId']
+                    foul_is_offensive = event['subType'] == 'offensive'
+                    foul_is_personal = event['subType'] == 'personal' or event['subType'] == 'offensive'
+                    if pd.notna(event['foulDrawnPersonId']):
+                        foul_drawn_id = int(event['foulDrawnPersonId']) if int(event['foulDrawnPersonId']) in self.player_ids else None
+                    if event['personId']:
+                        fouler_id = int(event['personId']) if int(event['personId']) in self.player_ids else None
+
                 elif event['actionType'] == 'substitution':
                     if event['subType'] == 'out':
-                        sub_out_id = event['personId']
+                        sub_out_id = int(event['personId']) if int(event['personId']) in self.player_ids else None
                     if event['subType'] == 'in':
-                        sub_in_id = event['personId']
+                        sub_in_id = int(event['personId']) if int(event['personId']) in self.player_ids else None
+
                 elif event['actionType'] == 'rebound':
-                    rebounder_id = event['personId']
+                    if not event['personId']:
+                        team_rebound = True
+                        rebounder_id = None
+                    else:
+                        rebounder_id = int(event['personId']) if int(event['personId']) in self.player_ids else None
+                        team_rebound = False
                     offensive_rebound = event['subType'] == 'offensive'
 
+                elif event['actionType'] == 'violation':
+                    if 'team' in event['qualifiers']:
+                        team_turnover = True
+                    else:
+                        team_turnover = False
 
-
-        
+                # insert, ill batch this later 
+                values = [game_id, event_num, event_type, event_subtype,
+                            home_score, away_score, period, clock,
+                            home_team_id, away_team_id, home_team_abrev, away_team_abrev,
+                            possession_team_id, possession_team_abrev, event_team_id, event_team_abrev, is_overtime,
+                            shooter_id, assister_id, jump_ball_winner_id, jump_ball_loser_id, jump_ball_recovered_id,
+                            rebounder_id, turnover_id, foul_drawn_id, fouler_id, stealer_id, blocker_id, sub_in_id, sub_out_id,
+                            foul_is_technical, foul_is_personal, foul_is_offensive, team_turnover, team_rebound, offensive_rebound,
+                            side, descriptor, area, area_detail, shot_distance, shot_made, shot_value, shot_x, shot_y]
+                try:
+                    self.cur.execute(
+                        """
+                        INSERT INTO pbp_raw_event (
+                            game_id, event_num, event_type, event_subtype,
+                            home_score, away_score, period, clock,
+                            home_team_id, away_team_id, home_team_abrev, away_team_abrev,
+                            possession_team_id, possession_team_abrev, event_team_id, event_team_abrev, is_overtime,
+                            shooter_id, assister_id, jump_ball_winner_id, jump_ball_loser_id, jump_ball_recovered_id,
+                            rebounder_id, turnover_id, foul_drawn_id, fouler_id, stealer_id, blocker_id, sub_in_id, sub_out_id,
+                            foul_is_technical, foul_is_personal, foul_is_offensive, team_turnover, team_rebound, offensive_rebound,
+                            side, descriptor, area, area_detail, shot_distance, shot_made, shot_value, shot_x, shot_y
+                        ) VALUES (
+                            %s, %s, %s, %s,
+                            %s, %s, %s, %s,
+                            %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                        ON CONFLICT (game_id, event_num) DO NOTHING;
+                        """,
+                        (values)
+                    )
+                except psycopg2.Error as e:
+                    print(values)
+                    self.logger.error(f"====== PBP STORAGE ERROR: {e} FOR GAME {game_id}, EVENT {event_num} ======")
+                    return False
 
 def main():
     load_dotenv() 
@@ -209,6 +308,7 @@ def main():
     conn = psycopg2.connect(DB_URL)
     data_loader = PBPDataLoader(conn, update=True)
     data_loader.load_pbp_data()
+    data_loader.commit_and_close()
 
 if __name__ == '__main__':
     main()

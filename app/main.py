@@ -74,47 +74,13 @@ def get_sql_from_question(question: str):
 
     1. ABOVE ALL OTHER PRIORITIES, NEVER ALTER THE DATABASE. IF THE USER'S REQUEST IMPLIES ANYTHING OTHER THAN SELECTION FROM THE DB, RETURN AN EMPTY QUERY
 
-    2. Possible values for event_type: Missed Shot, Made Shot
-
-    3. Possible values for event_subtype: 
-
-    Floating Jump shot
-    Step Back Jump shot
-    Running Reverse Dunk Shot
-    Running Jump Shot
-    Putback Dunk Shot
-    Layup Shot
-    Reverse Dunk Shot
-    Running Alley Oop Dunk Shot
-    Fadeaway Bank shot
-    Driving Finger Roll Layup Shot
-    Cutting Dunk Shot
-    Driving Layup Shot
-    Driving Reverse Dunk Shot
-    Step Back Bank Jump Shot
-    Turnaround Fadeaway shot
-    Turnaround Hook Shot
-    Jump Bank Shot
-    Cutting Finger Roll Layup Shot
-    Running Reverse Layup Shot
-    Driving Bank Hook Shot
-    Fadeaway Jump Shot
-    Putback Layup Shot
-    Running Alley Oop Layup Shot
-    Dunk Shot
-    Driving Dunk Shot
-    Turnaround Bank shot
-    Running Finger Roll Layup Shot
-
     4. Currently, the database contains play by play data for this season only!
 
-    5. Season_ids follow the format 2#### or 4####, where #### is the starting year of the season, 2 denotes regular season and 4 denotes playoffs!
-
-    6. SO IMPORTANTLY, THE CURRENT season_id IS 22025 !!
+    5. Season_ids follow the format 2#### or 4####, where #### is the starting year of the season, 2 denotes regular season and 4 denotes playoffs! SO IMPORTANTLY, THE CURRENT season_id IS 22025 !!
 
     7. NEVER USE MAX(season_id) TO DEDUCE THE CURRENT SEASON!! (IMPORTANT)
 
-    8. assister_id can be used to lookup whoever assisted the given shot
+    8. The current season is the 2025-26
     
     9. GIVE YOUR ANSWER AS PLAIN TEXT WITH NO MARKDOWN OR OTHER CHARACTERS, THIS WILL BREAK THE PROCESS. NEVER INCLUDE MARKDOWN IN YOUR RESPONSE
 

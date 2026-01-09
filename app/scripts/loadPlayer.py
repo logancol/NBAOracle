@@ -24,6 +24,6 @@ for player in all_players:
     first_name = player['first_name']
     last_name = player['last_name']
     is_active = player['is_active']
-    cur.execute("INSERT INTO PLAYER (player_id, player_full_name, player_first_name, player_last_name, player_is_active) VALUES (%s, %s, %s, %s, %s)", (id, full_name, first_name, last_name, is_active))
+    cur.execute("INSERT INTO PLAYER (id, full_name, first_name, last_name, is_active) VALUES (%s, %s, %s, %s, %s)", (id, full_name, first_name, last_name, is_active))
 
 conn.commit()
