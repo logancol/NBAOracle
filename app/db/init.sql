@@ -143,9 +143,11 @@ Enumeration for event_subtype: ['start', 'recovered', 'Jump Shot', 'defensive', 
        'illegal-out-of-bounds-screen', '8-second-violation',
        'jumpball violation']
 
-Enumeration for event_type: ['period', 'jumpball', '2pt', 'rebound', '3pt', 'turnover', 'steal',
+Enumeration for event_type: ['period', 'jumpball', '2pt', 'rebound', '3pt', 'turnover',
        'foul', 'timeout', 'block', 'freethrow', 'substitution',
        'violation', 'game', 'ejection']
+
+STEALS ARE REPRESENTED THROUGH TURNOVER EVENTS, IF A PLAYER STEALS, THEY'D BE LOGGED WITH stealer_id FOR THAT EVENT 
 
 Enumeration for decriptor: [nan, 'startperiod', 'pullup', 'floating', 'running', 'driving',
        'driving floating', 'fadeaway', 'tip', 'step back',

@@ -219,7 +219,7 @@ class PBPDataLoader:
                         jump_ball_loser_id = int(event['jumpBallLostPersonId']) if int(event['jumpBallLostPersonId']) in self.player_ids else None
                     if pd.notna(event['jumpBallWonPersonId']):
                         jump_ball_winner_id = int(event['jumpBallWonPersonId']) if int(event['jumpBallWonPersonId']) in self.player_ids else None
-
+                        
                 elif event['actionType'] == 'turnover':
                     if event['personId']:
                         turnover_id = int(event['personId']) if int(event['personId']) in self.player_ids else None

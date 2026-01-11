@@ -143,7 +143,7 @@ Enumeration for event_subtype: ['start', 'recovered', 'Jump Shot', 'defensive', 
        'illegal-out-of-bounds-screen', '8-second-violation',
        'jumpball violation']
 
-Enumeration for event_type: ['period', 'jumpball', '2pt', 'rebound', '3pt', 'turnover', 'steal',
+Enumeration for event_type: ['period', 'jumpball', '2pt', 'rebound', '3pt', 'turnover',
        'foul', 'timeout', 'block', 'freethrow', 'substitution',
        'violation', 'game', 'ejection']
 
@@ -174,6 +174,10 @@ Enumeration for area_detail; [nan, '16-24 Center', '24+ Left Center', '0-8 Cente
 Enumeration for side: [None, 'right', 'left']
 
 'violation' eventType subtypes: ['kicked ball', 'defensive goaltending', 'delay-of-game', 'lane']
+
+STEALS ARE REPRESENTED THROUGH TURNOVER EVENTS, IF A PLAYER STEALS, THEY'D BE LOGGED WITH stealer_id FOR THAT EVENT 
+
+SEASON IDS HAVE FORMAT 22025/42025, THE FIRST DIGIT BEING 2 OR 4 WITH 2 REPRESENTING REGULAR SEASON AND 4 REPRESENTING POST SEASON OR Playoffs
 */
 
 
