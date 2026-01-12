@@ -1,20 +1,10 @@
 import psycopg2
-from nba_api.stats.static import teams
 from nba_api.stats.static import players
-from nba_api.stats.endpoints import leaguegamefinder
-from nba_api.stats.library.parameters import Season
-from nba_api.stats.library.parameters import SeasonType
-from nba_api.stats.endpoints import playerindex
-import time
-import re
+from app.core.config import settings
 import pandas as pd
 
-conn = psycopg2.connect(
-    database="streamd",
-    user="docker",
-    password="docker",
-    port=5431
-)
+DB_URL = settings.DATABASE_URL
+conn = psycopg2.connect(DB_URL)
 cur = conn.cursor()
 
 all_players = players._get_players()

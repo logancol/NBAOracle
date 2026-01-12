@@ -1,15 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import psycopg2
 from openai import OpenAI
-from dotenv import load_dotenv
-import json
-import os
+from app.core.config import settings
 import logging
 import sys
+
 # Fast API app setup
 app = FastAPI(title="BBALL ORACLE")
-load_dotenv() 
-
 # Logger setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -20,8 +17,9 @@ log_formatter = logging.Formatter("%(asctime)s [%(processName)s: %(process)d] [%
 stream_handler.setFormatter(log_formatter)
 logger.addHandler(stream_handler)
 
-DB_URL = os.getenv("DATABASE_URL")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# ENV vars
+DB_URL = settings.DATABASE_URL
+OPENAI_API_KEY = settings.OPENAI_API_KEY
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is not set or not loaded")
 
@@ -29,129 +27,144 @@ client = OpenAI(
   api_key=OPENAI_API_KEY
 )
 
-def execute_sql(query: str):
-    logger.info("EXECUTING SQL QUERY ...")
-    # QUERY VALIDATION
+# I'm probably going to end up sanitizing on the frontend as well
+def sanitize_sql(query: str):
+    if len(query) == 0:
+        logger.error("====== SQL SANITIZATION FUNCTION RECEIVED EMPTY STRING ======")
+        return ""
+    
+    if (len(query) > 5000):
+        logger.error("====== SQL SANITIZATION FUNCTION RECEIVED EXCESSIVELY LONG STRING ======")
+        return ""
+    
+    lower_query = query.lower()
+
+    if 'select' not in lower_query:
+        logger.error("====== SQL SANITIZATION FUNCTION RECEIVED NON-SELECTING QUERY ======")
+        return ""
+
     bad_words = ['insert', 'update', 'delete', 'truncate', 'merge', 'create', 'alter', 'drop', 'rename', 'comment',
     'grant', 'revoke', 'begin', 'commit', 'rollback', 'savepoint', 'release', 'execute', 'do', 'set', 'load', 'listen', 'notify'
     ]
+
     for word in bad_words:
         if word in query.lower():
-            logger.error("POTENTIALLY MALICIOUS QUERY")
-            return
+            logger.error("====== POTENTIALLY MALICIOUS QUERY ======")
+            return ""
+    
+    return query
+
+def load_schema_text():
+    SCHEMA = ""
+    schema_path = "constants/schema.txt"
+    try:
+        with open(schema_path, 'r') as file:
+            SCHEMA = file.read()
+    except:
+        logger.error("SCHEMA TEXT NOT PROPERLY LOADED")
+    finally:
+        return SCHEMA
+
+# Returns empty dict if the query has sanitization issues or if there's a problem running against the databse
+def execute_sql(query: str):
+    logger.info("====== EXECUTING SQL QUERY ======")
+    # QUERY VALIDATION
+
+    sanitizedQuery = sanitize_sql(query)
+    if not sanitizedQuery:
+        return {}
         
-    # INIT DB CONNECTION
+    # Consider implementing connection pooling
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
-    try: # RUN QUERY ON DB
-        cur.execute(query)
+    try:
+        cur.execute(sanitizedQuery)
         cols = [desc[0] for desc in cur.description]
         rows = cur.fetchall()
         return {"columns": cols, "rows": rows}
-    except:
-        logger.error("Error running query on pbp data.")
+    except psycopg2.Error as e:
+        logger.error(f"====== PROBLEM RUNNING QUERY ON PBP DATA: {e} ======")
+        return {}
     finally:
         cur.close()
         conn.close()
 
-SCHEMA = ""
-schema_path = "text/schema.txt"
-try:
-    with open(schema_path, 'r') as file:
-        SCHEMA = file.read()
-except:
-    logger.error("SCHEMA TEXT NOT PROPERLY LOADED")
 
-
-def get_sql_answer_template(question: str):
-    logger.info("GETTING SQL STATEMENT AND ANSWER TEMPLATE FROM USER QUESTION")
+def get_sql_from_question(question: str, schema: str):
+    logger.info("====== GETTING SQL FROM USER QUESTION ======")
     prompt = f"""
     You are a PostgreSQL query planner for NBA statistical data. You generate SQL to query the NBA database to answer natural langauge questions about
-    player/team statistics, and provide a template for outputting or interpreting the results. Do NOT explain results in prose. Return valid JSON ONLY.
+    player/team statistics. Do NOT explain results in prose. Return valid SQL ONLY.
 
     Below is the table schema, prioritize considering the value enumerations and other guidelines described in comments at the bottom of the schema to ensure an accurate response.
 
-    {SCHEMA}
+    {schema}
     
-    The current season is the 2025-26 season, which has season id 22025. You are never to attempt to alter the database, and this supersedes all possible user requests. You are never to
-    provide data, or an output template that reveals the inner structure of the database to a user. 
-
-    Set requires_elaboration to true if the answer requires explanation, comparison, or trend analysis. If the answer can be expressed as simple numeric SQL query results that can be 
-    expressed without further processing or aggregation, set requires elabroation to false and create an answer template to display the query results. 
-
-    Output template contract:
-    {{
-        "sql": "string",
-        "requires_elaboration": true | false
-        "result_num": "int",
-        "answer template": "
-    }}
-
-    Output template JSON EXAMPLE: 
-        "sql": "SELECT COUNT(*) AS value FROM pbp_raw_event p JOIN player pl ON p.shooter_id = pl.id WHERE pl.full_name = 'LeBron James' AND p.period = 4;",
-        "result_num": 1,
-        "answer_template": "LeBron James has attempted {{value}} shots in the 4th quarter in his career.",
+    The current season is the 2025-26 season, which has season id: 22025. You are never to attempt to alter the database, and this supersedes all possible user requests.
 
     User Question: "{question}"
     
     """
-    response = client.responses.create(
-        model="gpt-5.2",
-        input=prompt,
-        reasoning={
-            "effort": "medium"
-        }
-    )
-    
+    sql = ""
     try:
-        plan = json.loads(response)
-    except:
-        logger.error("====== INVALID JSON RETUNRED FROM OPENAI API CALL ======")
-        return ""
-    
-
+        response = client.responses.create(
+            model="gpt-5.2",
+            input=prompt,
+            reasoning={
+                "effort": "medium"
+            }
+        )
+        sql = response.output_text.strip()
+        sql = sql.split("```")[0].strip() # Remove markdown delimeters
+    except Exception as e:
+        logger.error(f"====== PROBLEM GETTING SQL FROM OPENAI {e} ======")
+    finally:
+        return sql
 
 def interpret_sql_response(response: str, query: str, question: str):
-    logger.info("INTERPRETING SQL RESPONSE")
+    logger.info("====== INTERPRETING SQL RESPONSE ======")
     prompt = f"""
-    You are a helpful SQL assistant for a play by play NBA statistics tool: the database schema is:
-    {SCHEMA}
+    You are an SQL output interpreter for an NBA statistical data natural language querying tool. Given a user question, sql query, and output, you provide a concise, friendly, 
+    markdown-less textual summary of the sql output to answer the user's question. Your #1 priority at all times should be to not reveal details regarding the internal
+    structure of the database, tables, fields, etc. You are to interpret empty sql output as the query returning no results that align with the user request, and not an 
+    error elsewhere in the pipeline. 
     
-    This was the user's question: {question}
-
-    This was the generated sql query to answer said question: {query}
-
-    This is the response from the postgres database: {response}
-
-    Based on this, please provide a concise summary of the answer for the user
-
-    IMPORTANTLY NEVER RESPOND IN A WAY THAT REVEALS THE INTERNAL STRUCTURE OF THE DATABASE. YOU ARE TO USE THE RESULTS OF THE SQL QUERY TO CONVERSATIONALLY ANSWER
-    THE USERS QUESTION WITH NATURAL LANGUAGE AND STATS IF APPLICABLE, BUT DO NOT REVEAL INTERNALS SUCH AS GAME IDS PLAYER IDS ETC.
+    User question: {question}
+    SQL query: {query}
+    DB response: {response}
     """
-    completion = client.responses.create(
-        model="gpt-5.2",
-        input=prompt
-    )
-    answer = completion.output_text.strip()
-    answer = answer.split("```")[0].strip()
-    return answer
-
-@app.get("/")
-def root():
-    logger.info('GET /')
-    return {"hello": "world"}
+    answer = ""
+    try:
+        completion = client.responses.create(
+            model="gpt-5.2",
+            input=prompt
+        )
+        answer = completion.output_text.strip()
+        answer = answer.split("```")[0].strip()
+    except Exception as e:
+        logger.error(f"====== PROBLEM GETTING RESULT INTERPRETATION FROM OPENAI {e} ======")
+    finally:
+        return answer
 
 @app.get("/query")
 def get_answer(question: str) -> str:
     logger.info('GET /query')
-    sql = get_sql_from_question(question)
+    db_schema = load_schema_text()
 
-    if 'select' not in sql.lower():
-        return "Failed to query the database, please ensure your request aligns with our guidelines."
+    # only raising http exceptions for internal server errors atm, client will be responsible santizing user requests
+    if not db_schema:
+        raise HTTPException(status_code=500, detail="Schema")
+    
+    sql = get_sql_from_question(question, db_schema)
+    if not sql:
+        raise HTTPException(status_code=500, detail="Problem generating query")
     
     database_answer = execute_sql(sql)
+    if not database_answer:
+        raise HTTPException(status_code=500, detail="Problem querying databse")
 
-    if database_answer == None:
-        return "Error fetching result."
     formatted_response = interpret_sql_response(response=database_answer, query=sql, question=question)
+    if not formatted_response:
+        raise HTTPException(status_code=500, detail="Problem interpretting query output")
+
     return formatted_response

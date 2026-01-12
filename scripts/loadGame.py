@@ -1,10 +1,9 @@
 import psycopg2
 from time import sleep
-from dotenv import load_dotenv
 import pandas as pd
 import sys
 import logging
-import os
+from app.core.config import settings
 from nba_api.stats.endpoints import leaguegamefinder
 from datetime import datetime
 
@@ -141,8 +140,7 @@ class GameLoader():
         return False
 
 def main():
-    load_dotenv()
-    DB_URL = os.getenv('DATABASE_URL')
+    DB_URL = settings.DATABASE_URL
     conn = psycopg2.connect(DB_URL)
     game_loader = GameLoader(db_connection=conn, update=False)
     game_loader.load_regular_season_games()

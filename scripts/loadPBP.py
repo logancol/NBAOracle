@@ -1,14 +1,7 @@
 import psycopg2
-from nba_api.stats.static import teams
-from nba_api.stats.endpoints import leaguegamefinder
-from nba_api.stats.library.parameters import Season
-from nba_api.stats.library.parameters import SeasonType
 from nba_api.live.nba.endpoints import PlayByPlay
-from datetime import timedelta
-import isodate
-import time
 import re
-from dotenv import load_dotenv
+from app.core.config import settings
 import sys
 import pandas as pd
 import os
@@ -303,8 +296,7 @@ class PBPDataLoader:
                     return False
 
 def main():
-    load_dotenv() 
-    DB_URL = os.getenv("DATABASE_URL")
+    DB_URL = settings.DATABASE_URL
     conn = psycopg2.connect(DB_URL)
     data_loader = PBPDataLoader(conn, update=True)
     data_loader.load_pbp_data()

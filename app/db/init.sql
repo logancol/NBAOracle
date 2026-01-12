@@ -1,3 +1,12 @@
+CREATE TABLE user (
+    id SERIAL PRIMARY KEY,
+    full_name VARCHAR(256),
+    username VARCHAR(256) UNIQUE NOT NULL,
+    password_hash VARCHAR(256) NOT NULL,
+    email VARCHAR(256) UNIQUE,
+    created_at TIMESTAMP DEFAULT now()
+);
+
 CREATE TABLE player
 (
     id BIGINT PRIMARY KEY,
@@ -21,7 +30,7 @@ CREATE TABLE historical_team_index
 CREATE TABLE modern_team_index
 (
     id BIGINT, 
-    abrev VARCHAR(3),
+    abrev VARCHAR(3),q
     nickname VARCHAR(256),
     PRIMARY KEY(id, abrev)
 );

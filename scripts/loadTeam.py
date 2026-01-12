@@ -1,8 +1,7 @@
 import psycopg2
-import os
 import logging
 import time
-from dotenv import load_dotenv
+from app.core.config import settings
 from nba_api.stats.endpoints import TeamDetails
 import sys
 
@@ -93,8 +92,7 @@ class TeamLoader:
             
 
 def main():
-    load_dotenv()
-    DB_URL = os.getenv("DATABASE_URL")
+    DB_URL = settings.DATABASE_URL
     conn = psycopg2.connect(DB_URL)
     loader = TeamLoader(conn)
     loader.load_historical_teams()
