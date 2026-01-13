@@ -1,11 +1,10 @@
 import psycopg2
 from fastapi import HTTPException
 from typing import Optional
-import os
-from dotenv import load_dotenv
+from core.config import settings
+from bcrypt import hashpw, gensalt, checkpw
 
-load_dotenv()
-DB_URL = os.getenv("DATABASE_URL")
+DB_URL = settings.DATABASE_URL
 
 def init_db():
     conn = psycopg2.connect(DB_URL)
@@ -24,10 +23,21 @@ def init_db():
     cur.close()
     conn.close()
 
-def get_user(username: str) -> Optional[dict]:
+def get_user_by_username(username: str) -> Optional[dict]:
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
-    cur.execute("SELECT username, password_hash, email, full_name FROM users WHERE username = %s", username)
+    cur.execute("SELECT username, password_hash, email, full_name FROM user WHERE username = %s", (username,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if row:
+       return {"username": row[0], "password_hash": row[1], "email": row[2], "full_name": row[3]}
+    return None
+
+def get_user_by_email(email: str) -> Optional[dict]:
+    conn = psycopg2.connect(DB_URL)
+    cur = conn.cursor()
+    cur.execute("SELECT username, password_hash, email, full_name FROM user WHERE email = %s", (email,))
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -40,11 +50,14 @@ def create_user(username: str, password_hash: str, email: str = "", full_name: s
     cur = conn.cursor()
     try: 
         cur.execute(
-            "INSERT INTO user (username, full_name, password_hash, email) VALUES (%s, %s, %s, %s,)",
-            (username, full_name, password_hash, )
+            "INSERT INTO user (username, full_name, password_hash, email) VALUES (%s, %s, %s, %s)",
+            (username, full_name, password_hash, email)
         )
         cur.commit()
     except psycopg2.Error as e:
         raise HTTPException(status_code=409, detail="This username is already in use.")
     finally: 
         conn.close()
+
+def get_password_hash(password: str):
+    return hashpw(password.encode("utf-8"), gensalt()).decode("utf-8")

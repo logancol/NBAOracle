@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     DATABASE_URL: str
     OPENAI_API_KEY: str
+    SCHEMA_PATH: str
 
     @property
     def server_host(self) -> str:
