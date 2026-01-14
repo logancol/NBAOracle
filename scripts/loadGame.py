@@ -6,7 +6,7 @@ import sys
 import logging
 from app.core.config import settings
 from nba_api.stats.endpoints import leaguegamefinder
-from datetime import datetime
+from datetime import datetime, timedelta, date
 
 class GameLoader():
     def __init__(self, db_connection, update: bool):
@@ -112,8 +112,7 @@ class GameLoader():
             raise
         return True     
 
-    def load_regular_season_games(self):
-        success = True
+    def load_games(self):
         if not self.team_ids:
             raise RuntimeError(f"====== ABORTING GAME LOADING, TEAM IDS NOT FOUND ======")
         
@@ -122,11 +121,11 @@ class GameLoader():
                 self.logger.info(f'====== LOADING {"CURRENT SEASON" if self.update else "ALL"} GAMES FOR TEAM {id} ======')
                 if self.update:
                     gamefinder_regular = self._with_retry(
-                        lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Regular Season", season_nullable='2025-26'),
+                        lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Regular Season", season_nullable='2025-26', date_from_nullable=(date.today() - timedelta(days=3))),
                         desc=f"Regular season games for 2025/26 season for team {id}"
                     )
                     gamefinder_playoff = self._with_retry(
-                        lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Playoffs", season_nullable='2025-26' ),
+                        lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Playoffs", season_nullable='2025-26', date_from_nullable=(date.today() - timedelta(days=3))),
                         desc=f"Playoff games for 2025/26 season for team {id}"
                     )
 
@@ -149,14 +148,3 @@ class GameLoader():
                 games = gamefinder_playoff.get_data_frames()[0]
                 for _, game in games.iterrows():
                     self.insert_game(cur, game, "playoff")
-
-def main():
-    DB_URL = settings.DATABASE_URL
-    # managing connection with context manager
-    with psycopg.connect(DB_URL) as conn:
-        with conn.transaction():
-            game_loader = GameLoader(db_connection=conn, update=False)
-            game_loader.load_regular_season_games()
-
-if __name__ == '__main__':
-    main()

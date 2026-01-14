@@ -8,7 +8,6 @@
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     full_name VARCHAR(256),
-    username VARCHAR(256) UNIQUE NOT NULL,
     password_hash VARCHAR(256) NOT NULL,
     email VARCHAR(256) UNIQUE,
     created_at TIMESTAMP DEFAULT now()

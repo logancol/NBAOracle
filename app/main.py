@@ -6,7 +6,7 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 from fastapi.security import OAuth2PasswordRequestForm
-from app.auth.token import Token
+from StreamD.app.models.token import Token
 from app.db.db import get_async_pool, get_pool
 from app.api.questions import router as questions_router
 
