@@ -1,4 +1,5 @@
 import psycopg
+from psycopg import AsyncConnection
 from fastapi import HTTPException
 from typing import Optional
 from app.core.config import settings
@@ -19,22 +20,22 @@ def init_db(conn: psycopg.connection):
             );
             """)
 
-def get_user_by_email(conn: psycopg.connection, email: str) -> Optional[dict]:
-    with conn.cursor() as cur:
-        cur.execute("SELECT password_hash, email, full_name FROM users WHERE email = %s", (email,))
-        row = cur.fetchone()
+async def get_user_by_email(conn: AsyncConnection, email: str) -> Optional[dict]:
+    async with conn.cursor() as cur:
+        await cur.execute("SELECT password_hash, email, full_name FROM users WHERE email = %s", (email,))
+        row = await cur.fetchone()
     if row:
         return {"password_hash": row[0], "email": row[1], "full_name": row[2]}
     return None
 
-def create_user(conn: psycopg.connection, password: str, email: str, full_name: str = ""):
+async def create_user(conn: AsyncConnection, password: str, email: str, full_name: str = ""):
     if not email:
         raise HTTPException(status_code=400, detail="Email required")
     password_hash = get_password_hash(password)
     try:
-        with conn.transaction():
-            with conn.cursor() as cur:
-                cur.execute(
+        async with conn.transaction():
+            async with conn.cursor() as cur:
+                await cur.execute(
                     "INSERT INTO users (full_name, password_hash, email) VALUES (%s, %s, %s, %s)",
                     (full_name, password_hash, email)
                 )

@@ -15,14 +15,15 @@ from models.user import User
 JWT_SECRET_KEY = settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
 
-oauth2_scheme = OAuth2PasswordBearer("/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer("/auth/login")
 
-def authenticate_user(password: str, email: str, conn: AsyncConnection = Depends(get_async_conn)):
-    if email:
-        user = get_user_by_email(email, conn=conn)
+async def authenticate_user(password: str, email: str, conn: AsyncConnection):
+    if not email or not password:
+        return None
+    user = await get_user_by_email(email, conn=conn)
     if not user:
-        return False
-    if not verify_password(plain_text=password, hashed_password=user.password_hash):
+        return None
+    if not verify_password(plain_text=password, hashed_password=user['password_hash']):
         return False
     return user
 
@@ -45,12 +46,12 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], conn: 
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
-        if email is None:
+        if not email:
             raise credentials_exception
         token_data = TokenData(email=email)
     except InvalidTokenError:
         raise credentials_exception
-    user = get_user_by_email(email=token_data.email, conn=conn)
+    user = get_user_by_email(conn=conn, email=token_data.email)
     if user is None:
         raise credentials_exception
     return user

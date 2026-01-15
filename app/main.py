@@ -9,6 +9,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from StreamD.app.models.token import Token
 from app.db.db import get_async_pool, get_pool
 from app.api.questions import router as questions_router
+from app.api.auth import router as auth_router
 
 # Global logging config for api
 logging.basicConfig(
@@ -50,3 +51,4 @@ stream_handler.setFormatter(log_formatter)
 logger.addHandler(stream_handler)
 
 app.include_router(questions_router)
+app.include_router(auth_router)
