@@ -30,6 +30,8 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("RO DATABASE URL NOT SET OR LOADED")
     if not settings.DATABASE_URL_RW:
         raise RuntimeError("RW DATABASE URL NOT SET OR LOADED")
+    if not settings.DATABASE_URL_AUTHR:
+        raise RuntimeError("AR DATABASE URL NOT SET OR LOADED")
     
     # instantiating openai client as part of global state
     app.state.openai_client = OpenAI(api_key=OPENAI_API_KEY)
@@ -39,7 +41,7 @@ async def lifespan(app: FastAPI):
         with open(schema_path, 'r') as file:
             app.state.schema = file.read()
     except FileNotFoundError:
-        logger.error(f"====== Schema file not found: {schema_path} ======")
+        logger.error(f"Schema file not found: {schema_path}")
         return
     await get_async_pool_ro().open()
     await get_async_pool_rw().open()

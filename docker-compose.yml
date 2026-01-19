@@ -5,7 +5,7 @@ services:
     stdin_open: true
     build:
       context: .
-      dockerfile: local.Dockerfile
+      dockerfile: Dockerfile
     command: uvicorn app.main:app --reload --proxy-headers --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"

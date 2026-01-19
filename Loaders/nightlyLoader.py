@@ -1,9 +1,9 @@
 # nightly updates (game, pbp, new players)
-from Loaders.loadPlayer import PlayerLoader
-from Loaders.loadPBP import PBPDataLoader
+from loaders.loadPlayer import PlayerLoader
+from loaders.loadPBP import PBPDataLoader
 import psycopg
 from app.core.config import settings
-from Loaders.loadGame import GameLoader
+from loaders.loadGame import GameLoader
 
 # -> update player index -> update game data -> update play by play data
 def main():

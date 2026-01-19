@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 @limiter.limit("10/minute")
 async def get_answer(question: QuestionBase, request: Request, conn: AsyncConnection = Depends(get_async_conn_ro), 
                      current_user: UserInDB = Depends(get_current_active_user)) -> AnswerBase:
-    log.info(f"====== QUESTION ENDPOINT HIT BY USER: {current_user.email} QUESTION LENGTH: {len(question.question)}")
+    log.info(f"QUESTION ENDPOINT HIT BY USER: {current_user.email} QUESTION LENGTH: {len(question.question)}")
     oracle = Oracle(logger=log, schema=request.app.state.schema, client=request.app.state.openai_client)
     textual_answer = await oracle.ask_oracle(question.question, conn=conn)
     return AnswerBase(answer=textual_answer)

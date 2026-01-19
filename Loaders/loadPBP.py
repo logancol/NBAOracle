@@ -22,13 +22,13 @@ class PBPDataLoader:
             self.logger.addHandler(stream_handler)
         self.update = update
         try:
-            self.logger.info(f"====== FETCHING UNIQUE PLAYER IDS =======")
+            self.logger.info(f"FETCHING UNIQUE PLAYER IDS")
             with self.conn.cursor() as cur:
                 cur.execute("SELECT DISTINCT id FROM player;")
                 rows = cur.fetchall()
             self.player_ids = {int(row[0]) for row in rows}
         except Exception as e:
-            raise RuntimeError(f"====== PROBLEM LOADING PLAYER IDS =======") from e
+            raise RuntimeError(f"PROBLEM LOADING PLAYER IDS") from e
         
     # --- retries to be robust against nba_api errors and rate limiting
     def _with_retry(self, fn, desc: str, max_attempts: int = 6, base_sleep: float = 0.5, max_sleep: float = 60.0):
@@ -38,10 +38,10 @@ class PBPDataLoader:
                 return fn()
             except Exception as e:
                 if call_attempt == max_attempts:
-                    self.logger.error(f"====== FATAL ERROR WORKING WITH NBA API, ROLLING BACK ======")
+                    self.logger.error(f"FATAL ERROR WORKING WITH NBA API, ROLLING BACK")
                     raise
                 else:
-                    self.logger.warning(f"====== Problem with NBA API fetching {desc} Attempt {call_attempt} out of {max_attempts}: {e} ======")
+                    self.logger.warning(f"Problem with NBA API fetching {desc} Attempt {call_attempt} out of {max_attempts}: {e}")
                 jitter = random.uniform(0, 0.5 * delay)
                 sleep(delay + jitter)
                 delay = min(delay * 2, max_sleep)
@@ -63,6 +63,7 @@ class PBPDataLoader:
         
         return interval_str
     
+    # --- helps validate type saftey for player ids, they occasionally come back as int, string, float, none
     def _player_id_or_none(self, id):
         if pd.isna(id):
             return None
@@ -89,7 +90,7 @@ class PBPDataLoader:
                 cur.execute('SELECT id, season_type, season_id, home_team_id, away_team_id, home_team_abrev, away_team_abrev, date FROM game;') 
                 rows = cur.fetchall()
         except psycopg.Error as e:
-            self.logger.error(f"====== ERROR FETCHING GAME INFO: {e} ======")
+            self.logger.error(f"ERROR FETCHING GAME INFO: {e}")
             raise
 
         relevant_games = [row for row in rows if row[2] in season_ids]
@@ -99,7 +100,7 @@ class PBPDataLoader:
 
         # getting pbp dfs for each fetched game, processing, inserting into dataframe
         for count, row in enumerate(relevant_games, start=1):
-            self.logger.info(f'====== FETCHING AND STORING PBP INFO FOR GAME: {count} OF {num_games} ======')
+            self.logger.info(f'FETCHING AND STORING PBP INFO FOR GAME: {count} OF {num_games}')
             with self.conn.transaction():
                 with self.conn.cursor() as cur:
                     count += 1
@@ -272,5 +273,5 @@ class PBPDataLoader:
                                 tuple(values)
                             )
                         except psycopg.Error as e:
-                            self.logger.error(f"====== PBP STORAGE ERROR: {e} FOR GAME {game_id}, EVENT {event_num} ======")
+                            self.logger.error(f"PBP STORAGE ERROR: {e} FOR GAME {game_id}, EVENT {event_num}")
                             raise

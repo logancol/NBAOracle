@@ -5,7 +5,7 @@ from app.models.reqres import QuestionBase
 import re
 
 
-class Oracle():
+class Oracle:
     def __init__(self, logger, schema: str, client: OpenAI):
         # implement connection pooling at some point
         self.client = client
@@ -14,35 +14,38 @@ class Oracle():
 
     def sanitize_sql(self, query: str) -> str:
         if not query or not query.strip():
-            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED EMPTY STRING ======")
+            self.logger.error("SQL SANITIZATION FUNCTION RECEIVED EMPTY STRING")
             return ""
 
         query = query.strip()
 
         if len(query) > 5000:
-            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED EXCESSIVELY LONG STRING ======")
+            self.logger.error("SQL SANITIZATION FUNCTION RECEIVED EXCESSIVELY LONG STRING")
             return ""
 
         lower = query.lower()
 
         if not (lower.startswith("select") or lower.startswith("with")):
-            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED NON-SELECTING QUERY ======")
+            self.logger.error("SQL SANITIZATION FUNCTION RECEIVED NON-SELECTING QUERY")
             return ""
         
         if "--" in query or "/*" in query:
-            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED COMMENTED QUERY ======")
+            self.logger.error("SQL SANITIZATION FUNCTION RECEIVED COMMENTED QUERY")
             return ""
+        
+        if ";" in query:
+            self.logger.error("MULTI STATEMENT QUERY")
 
         blocked = r"\b(insert|update|delete|drop|alter|create|grant|revoke|truncate|call|copy)\b"
         if re.search(blocked, lower):
-            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED DISALLOWED KEYWORD ======")
+            self.logger.error("SQL SANITIZATION FUNCTION RECEIVED DISALLOWED KEYWORD")
             return ""
 
         return query
 
     # Async database operation returns empty dict if the query has sanitization issues or if there's a problem running against the databse
     async def execute_sql(self, query: str, conn: psycopg.AsyncConnection):
-        self.logger.info("====== EXECUTING SQL QUERY ======")
+        self.logger.info("EXECUTING SQL QUERY")
         # QUERY VALIDATION
 
         sanitizedQuery = self.sanitize_sql(query)
@@ -56,13 +59,13 @@ class Oracle():
                 rows = await cur.fetchmany(200) # hard-coded safeguard for now
                 return {"columns": cols, "rows": rows}
             except psycopg.Error as e:
-                self.logger.error(f"====== PROBLEM RUNNING QUERY ON PBP DATA: {e} ======")
+                self.logger.error(f"PROBLEM RUNNING QUERY ON PBP DATA: {e}")
                 return {}
 
     def get_sql_from_question(self, question: str):
-        self.logger.info("====== GETTING SQL FROM USER QUESTION ======")
+        self.logger.info("GETTING SQL FROM USER QUESTION")
         prompt = f"""
-        You are a PostgreSQL query planner for NBA statistical data. You generate SQL to query the NBA database to answer natural langauge questions about
+        You are a PostgreSQL query planner for NBA statistical data. You generate SQL to query the NBA database to answer natural language questions about
         player/team statistics. Do NOT explain results in prose. Return valid SQL ONLY.
 
         Below is the table schema, prioritize considering the value enumerations and other guidelines described in comments at the bottom of the schema to ensure an accurate response.
@@ -81,14 +84,14 @@ class Oracle():
                 input=prompt
             )
             sql = response.output_text.strip()
-            sql = sql.split("```")[0].strip() # Remove markdown delimeters
+            sql = sql.split("```")[0].strip() # Remove markdown delimiters
         except Exception as e:
-            self.logger.error(f"====== PROBLEM GETTING SQL FROM OPENAI {e} ======")
+            self.logger.error(f"PROBLEM GETTING SQL FROM OPENAI {e}")
         finally:
             return sql
 
     def interpret_sql_response(self, response: str, query: str, question: str):
-        self.logger.info("====== INTERPRETING SQL RESPONSE ======")
+        self.logger.info("INTERPRETING SQL RESPONSE")
         prompt = f"""
         You are an SQL output interpreter for an NBA statistical data natural language querying tool. Given a user question, sql query, and output, you provide a concise, friendly, 
         markdown-less textual summary of the sql output to answer the user's question. Your #1 priority at all times should be to not reveal details regarding the internal
@@ -108,7 +111,7 @@ class Oracle():
             answer = completion.output_text.strip()
             answer = answer.split("```")[0].strip()
         except Exception as e:
-            self.logger.error(f"====== PROBLEM GETTING RESULT INTERPRETATION FROM OPENAI {e} ======")
+            self.logger.error(f"PROBLEM GETTING RESULT INTERPRETATION FROM OPENAI {e}")
         finally:
             return answer
         
@@ -121,10 +124,10 @@ class Oracle():
     
         database_answer = await self.execute_sql(query=sql, conn=conn)
         if not database_answer:
-            raise HTTPException(status_code=500, detail="Problem querying databse")
+            raise HTTPException(status_code=500, detail="Problem querying database")
 
         formatted_response = self.interpret_sql_response(response=database_answer, query=sql, question=question)
         if not formatted_response:
-            raise HTTPException(status_code=500, detail="Problem interpretting query output")
+            raise HTTPException(status_code=500, detail="Problem interpreting query output")
 
         return formatted_response

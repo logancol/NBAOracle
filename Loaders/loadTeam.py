@@ -47,10 +47,10 @@ class TeamLoader:
                 return fn()
             except Exception as e:
                 if call_attempt == max_attempts:
-                    self.logger.error(f"====== FATAL ERROR WORKING WITH NBA API, ROLLING BACK ======: {e}")
+                    self.logger.error(f"FATAL ERROR WORKING WITH NBA API, ROLLING BACK: {e}")
                     raise
                 else:
-                    self.logger.warning(f"====== Problem with NBA API fetching {desc} Attempt {call_attempt} out of {max_attempts}: {e} ======")
+                    self.logger.warning(f"Problem with NBA API fetching {desc} Attempt {call_attempt} out of {max_attempts}: {e}")
                 jitter = random.uniform(0, 0.5 * delay)
                 time.sleep(delay + jitter)
                 delay = min(delay * 2, max_sleep)
@@ -63,8 +63,8 @@ class TeamLoader:
             )
             historical = df[1]
             for _, row in historical.iterrows():
-                self.logger.info(f"====== STORING HISTORICAL TEAM INDEX FOR TEAM WITH ID: {team_id} ======")
-                self.logger.info(f"====== {team_id}, {row['CITY']}, {row['NICKNAME']}, {row['YEARFOUNDED']}, {row['YEARACTIVETILL']}")
+                self.logger.info(f"STORING HISTORICAL TEAM INDEX FOR TEAM WITH ID: {team_id}")
+                self.logger.info(f"{team_id}, {row['CITY']}, {row['NICKNAME']}, {row['YEARFOUNDED']}, {row['YEARACTIVETILL']}")
                 current_iteration = False
                 if row['YEARACTIVETILL'] == historical['YEARACTIVETILL'].max():
                     current_iteration = True
@@ -72,17 +72,17 @@ class TeamLoader:
                     cur.execute("INSERT INTO historical_team_index (id, current_iteration, city, nickname, year_founded, year_active_til) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING;", 
                             (team_id, current_iteration, row['CITY'], row['NICKNAME'], row['YEARFOUNDED'], row['YEARACTIVETILL']))
                 except psycopg.Error:
-                    self.logger.error(f"====== ERROR STORING HISTORICAL TEAM INDEX FOR TEAM WITH ID: {team_id} ======")
+                    self.logger.error(f"ERROR STORING HISTORICAL TEAM INDEX FOR TEAM WITH ID: {team_id}")
                     raise
             time.sleep(.2)
 
     def load_modern_teams(self, cur):
         for abrev in self.abrev_id_map.keys():
-            self.logger.info(f"====== STORING MODERN TEAM INDEX FOR TEAM WITH ABBREVIATION: {abrev} ======")
+            self.logger.info(f"STORING MODERN TEAM INDEX FOR TEAM WITH ABBREVIATION: {abrev}")
             team_id = self.abrev_id_map[abrev]
             nickname = self.abrev_nickname_map[abrev]
             try:
                 cur.execute("INSERT INTO modern_team_index (id, abrev, nickname) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (team_id, abrev, nickname))
             except psycopg.Error as e:
-                self.logger.error(f"====== ERROR STORING MODERN TEAM INDEX FOR TEAM WITH ABBREVIATION: {abrev} ERROR: {e} ======")
+                self.logger.error(f"ERROR STORING MODERN TEAM INDEX FOR TEAM WITH ABBREVIATION: {abrev} ERROR: {e}")
                 raise

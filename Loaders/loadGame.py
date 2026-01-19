@@ -8,7 +8,7 @@ from app.core.config import settings
 from nba_api.stats.endpoints import leaguegamefinder
 from datetime import datetime, timedelta, date
 
-class GameLoader():
+class GameLoader:
     def __init__(self, db_connection, update: bool):
         # Configure database connection, logger
         self.conn = db_connection
@@ -21,13 +21,13 @@ class GameLoader():
             stream_handler.setFormatter(log_formatter)
             self.logger.addHandler(stream_handler)
         try:
-            self.logger.info(f"====== FETCHING UNIQUE TEAM IDS =======")
+            self.logger.info(f"FETCHING UNIQUE TEAM IDS")
             with self.conn.cursor() as cur:
                 cur.execute("SELECT DISTINCT id FROM modern_team_index;")
                 rows = cur.fetchall()
             self.team_ids = [row[0] for row in rows]
         except Exception:
-            raise RuntimeError("====== PROBLEM LOADING TEAM IDS ======")
+            raise RuntimeError("PROBLEM LOADING TEAM IDS")
 
         # abreviation to team id conversions for the play by play era
         self.abrev_id_map = {'ATL': 1610612737, 'BKN': 1610612751,'BOS': 1610612738,'CHA': 1610612766,'CHH': 1610612766,'CHI': 1610612741,'CLE': 1610612739,
@@ -75,7 +75,7 @@ class GameLoader():
             cur.execute("INSERT INTO game (id, season_id, home_team_id, home_team_abrev, away_team_id, away_team_abrev, date, season_type, winner_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING;",
                             (game_id, game_season_id, home_team_id, home_team_abrev, away_team_id, away_team_abrev, game_date, season_type, game_winner_id))
         except psycopg.Error as e:
-            self.logger.error(f"====== ERROR INSERTING GAME WITH ID {game_id}, ERROR: {e} ABORTING ... ======")
+            self.logger.error(f"ERROR INSERTING GAME WITH ID {game_id}, ERROR: {e} ABORTING ...")
             raise
         
         # TEAM PERFORMANCE
@@ -108,17 +108,17 @@ class GameLoader():
                                                                 three_pointers_made, three_pointers_attempted, three_pointer_percentage, free_throws_made, free_throws_attempted, free_throw_percentage, 
                                                                 offensive_rebounds, defensive_rebounds, total_rebounds, assists, steals, blocks, turnovers, personal_fouls, plus_minus))
         except psycopg.Error as e: 
-            self.logger.error(f"====== ERROR INSERTING TEAM SPECIFIC GAME INFO WITH GAME ID: {game_id}, TEAM ID: {primary_team_id} ERROR: {e} ABORTING ... ======")
+            self.logger.error(f"ERROR INSERTING TEAM SPECIFIC GAME INFO WITH GAME ID: {game_id}, TEAM ID: {primary_team_id} ERROR: {e} ABORTING ...")
             raise
         return True     
 
     def load_games(self):
         if not self.team_ids:
-            raise RuntimeError(f"====== ABORTING GAME LOADING, TEAM IDS NOT FOUND ======")
+            raise RuntimeError(f"ABORTING GAME LOADING, TEAM IDS NOT FOUND")
         
         with self.conn.cursor() as cur:
             for id in self.team_ids:
-                self.logger.info(f'====== LOADING {"CURRENT SEASON" if self.update else "ALL"} GAMES FOR TEAM {id} ======')
+                self.logger.info(f'LOADING {"CURRENT SEASON" if self.update else "ALL"} GAMES FOR TEAM {id}')
                 if self.update:
                     gamefinder_regular = self._with_retry(
                         lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Regular Season", season_nullable='2025-26', date_from_nullable=(date.today() - timedelta(days=3))),
