@@ -1,3 +1,3 @@
 # bballOracle
 
-AI-powered Natural language sql querying tool for non-technical basketball enthusiasts to easily derive player-insights from raw play-by-play data. 
+Natural language querying web tool for basketball enthusiasts to derive exploratory insights from NBA play-by-play data. Currently hosted as an api, soon to integrate frontend...
