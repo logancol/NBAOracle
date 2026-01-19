@@ -1,3 +1,3 @@
-# bballOracle
+# NBA Oracle
 
 Natural language querying web tool for basketball enthusiasts to derive exploratory insights from NBA play-by-play data. Currently hosted as an api, soon to integrate frontend...
