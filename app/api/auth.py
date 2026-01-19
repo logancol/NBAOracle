@@ -9,7 +9,7 @@ from app.models.user import UserCreate, UserPublic
 from app.services.auth_service import authenticate_user, create_access_token
 from app.services.user_service import create_user
 from app.db.db import get_async_conn_rw, get_async_conn_ar
-from StreamD.app.services.rate_limiting import limiter
+from app.services.rate_limiting import limiter
 
 router = APIRouter(prefix='/auth', tags=['Auth'])
 

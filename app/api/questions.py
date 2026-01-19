@@ -6,7 +6,7 @@ from app.services.auth_service import get_current_active_user
 from app.models.user import UserInDB
 import logging
 from app.models.reqres import QuestionBase, AnswerBase
-from StreamD.app.services.rate_limiting import limiter
+from app.services.rate_limiting import limiter
 
 router = APIRouter()
 log = logging.getLogger(__name__)

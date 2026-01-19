@@ -1,6 +1,6 @@
 GRANT USAGE ON SCHEMA public TO oracle_readonly;
 GRANT USAGE ON SCHEMA public TO auth_readonly;
-GRANT USAGE ON SCHEMA public TO app_rw;
+GRANT USAGE, CREATE ON SCHEMA public TO app_rw;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO oracle_readonly;
 REVOKE ALL ON TABLE public.users FROM oracle_readonly;

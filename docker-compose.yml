@@ -1,4 +1,20 @@
 services:
+  api:
+    container_name: api
+    tty: true
+    stdin_open: true
+    build:
+      context: .
+      dockerfile: local.Dockerfile
+    command: uvicorn app.main:app --reload --proxy-headers --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - database
   database:
     image: postgres:16
     container_name: streamd_db

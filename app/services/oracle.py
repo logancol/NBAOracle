@@ -29,10 +29,6 @@ class Oracle():
             self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED NON-SELECTING QUERY ======")
             return ""
         
-        if ";" in query:
-            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED MULTI-STATEMENT QUERY ======")
-            return ""
-        
         if "--" in query or "/*" in query:
             self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED COMMENTED QUERY ======")
             return ""

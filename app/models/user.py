@@ -22,6 +22,9 @@ class UserCreate(UserBase):
         return v
     model_config = ConfigDict(extra="forbid")
 
+class UserPublic(UserBase):
+    model_config = ConfigDict(extra="forbid")
+
 class UserInDB(UserBase):
     model_config = ConfigDict(extra="forbid")
     password_hash: str

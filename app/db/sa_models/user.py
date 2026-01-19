@@ -12,7 +12,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(256), nullable=False, unique=True, index=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,

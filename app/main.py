@@ -3,14 +3,14 @@ from app.core.config import settings
 import logging
 import sys
 from contextlib import asynccontextmanager
-from app.db.db import get_async_pool_ro, get_async_pool_ar, get_async_pool_rw, get_pool_ro, get_pool_rw
+from app.db.db import get_async_pool_ro, get_async_pool_ar, get_async_pool_rw
 from app.api.questions import router as questions_router
 from app.api.auth import router as auth_router
 from fastapi import FastAPI
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi import _rate_limit_exceeded_handler
-from StreamD.app.services.rate_limiting import limiter
+from app.services.rate_limiting import limiter
 
 # Global logging config for api
 logging.basicConfig(
