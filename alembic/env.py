@@ -5,6 +5,7 @@ from sqlalchemy import pool
 from app.db.sa_base import Base
 from app.core.config import settings
 from alembic import context
+import app.db.sa_models
 import os
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -14,9 +15,11 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+target_metadata = Base.metadata
 
 if settings.ENVIRONMENT == 'local':
     db_url = settings.DATABASE_URL_MIGRATIONS
+
 elif settings.ENVIRONMENT == 'production':
     db_url = os.getenv("DATABASE_URL_MIGRATIONS")
     if not db_url: 
@@ -31,13 +34,10 @@ config.set_main_option("sqlalchemy.url", db_url)
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = Base.metadata
-
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
