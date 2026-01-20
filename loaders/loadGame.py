@@ -130,20 +130,24 @@ class GameLoader:
                         lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Regular Season", season_nullable='2025-26', date_from_nullable=date_from_nullable),
                         desc=f"Regular season games for 2025/26 season for team {id}"
                     )
+                    sleep(1)
                     gamefinder_playoff = self._with_retry(
                         lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Playoffs", season_nullable='2025-26', date_from_nullable=date_from_nullable),
                         desc=f"Playoff games for 2025/26 season for team {id}"
                     )
+                    sleep(1)
 
                 else:
                     gamefinder_regular = self._with_retry(
                         lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Regular Season", date_from_nullable='11-01-1996'), # pbp era
                         desc=f"Regular Season games for entire pbp era for team: {id}"
                     )
+                    sleep(1)
                     gamefinder_playoff = self._with_retry(
                         lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Playoffs", date_from_nullable='11-01-1996'),
                         desc=f"Playoff games for entire pbp era for team: {id}"
                     )
+                    sleep(1)
 
                 # ITERATE THROUGH REGULAR SEASON GAMES FOR TEAM
                 games = gamefinder_regular.get_data_frames()[0]
