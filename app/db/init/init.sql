@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS game_team_performance
 );
 
 CREATE TABLE IF NOT EXISTS pbp_raw_event(
+    id SERIAL NOT NULL PRIMARY KEY,
     game_id BIGINT REFERENCES game(id),
     season_id INT,
     season_type TEXT,
@@ -137,10 +138,43 @@ CREATE TABLE IF NOT EXISTS pbp_raw_event(
     FOREIGN KEY (home_team_id, home_team_abrev) REFERENCES modern_team_index (id, abrev),
     FOREIGN KEY (away_team_id, away_team_abrev) REFERENCES modern_team_index (id, abrev),
     FOREIGN KEY (possession_team_id, possession_team_abrev) REFERENCES modern_team_index (id, abrev),
-    FOREIGN KEY (event_team_id, event_team_abrev) REFERENCES modern_team_index (id, abrev),
-    PRIMARY KEY (game_id, event_num)
+    FOREIGN KEY (event_team_id, event_team_abrev) REFERENCES modern_team_index (id, abrev)
 );
 
+-- Creating new tables to help the model in weird scenarios
+CREATE TABLE IF NOT EXISTS possessions(
+    game_id BIGINT REFERENCES game(id),
+    possession_id SERIAL PRIMARY KEY,
+    offense_team_id BIGINT,
+    defense_team_id BIGINT,
+    start_pbp_event INT REFERENCES pbp_raw_event(id),
+    end_pbp_event INT REFERENCES pbp_raw_event(id),
+    possession_period INT,
+    start_clock INTERVAL,
+    end_clock INTERVAL,
+    points INT,
+    result VARCHAR(256)
+);
 
+CREATE TABLE IF NOT EXISTS player_stints(
+    id SERIAL PRIMARY KEY,
+    game_id BIGINT REFERENCES game(id) NOT NULL,
+    player_id BIGINT REFERENCES player(id) NOT NULL,
+    team_id BIGINT,
+    start_pbp_event INT REFERENCES pbp_raw_event(id),
+    end_pbp_event INT REFERENCES pbp_raw_event(id),
+    start_clock INTERVAL,
+    end_clock INTERVAL,
+    possession_period INT,
+    seconds_played INT
+)
 
-
+CREATE TABLE IF NOT EXISTS shots(
+    game_id BIGINT REFERENCES game(id) NOT NULL,
+    shooter_id BIGINT REFERENCES player(id) NOT NULL,
+    team_id BIGINT,
+    shot_x FLOAT,
+    shot_y FLOAT,
+    zone
+    ....
+)
